@@ -44,6 +44,58 @@ def initialize_mcp_servers(config):
     
     return servers
 
+import functools
+import inspect
+from typing import Callable, Any, Dict, Optional
+
+def register_tool_with_signature(agent, original_func, tool_name=None):
+    """
+    Register a function as a tool with pydantic-ai while preserving its signature.
+    
+    This helper allows you to avoid duplicating function signatures when
+    registering tools with pydantic-ai.
+    
+    Args:
+        agent: The pydantic-ai Agent instance
+        original_func: The function to register as a tool
+        tool_name: Optional custom name for the tool (defaults to function name)
+    
+    Returns:
+        The registered tool function
+    """
+    # Create a wrapper that preserves docstring and signature
+    @functools.wraps(original_func)
+    async def wrapper(*args, **kwargs):
+        return await original_func(*args, **kwargs)
+    
+    # Register the wrapper as a tool
+    name = tool_name or original_func.__name__
+    
+    # Apply the decorator to our wrapper function
+    wrapped_tool = agent.tool_plain(wrapper)
+    
+    # Store the registered tool in the agent's tools dict under the specified name
+    return wrapped_tool
+
+def register_core_tools(agent, tools_dict):
+    """
+    Register multiple tools from a dictionary while preserving signatures.
+    
+    Args:
+        agent: The pydantic-ai Agent instance
+        tools_dict: Dictionary mapping tool names to functions
+    
+    Returns:
+        Dictionary of registered tool functions
+    """
+    registered_tools = {}
+    
+    for name, func in tools_dict.items():
+        registered_tools[name] = register_tool_with_signature(agent, func, name)
+        
+    return registered_tools
+
+
 async def test():
     model = OpenAIModel("gpt-4o-mini")
     mcp_config = load_mcp_config()
